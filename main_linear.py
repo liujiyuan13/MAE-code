@@ -2,7 +2,8 @@ import time
 import math
 import argparse
 import torch
-import tensorboard_logger as tb_logger
+import torch.nn.functional as F
+import tensorboard_logger
 
 from vit import ViT
 from model import LinearProb
@@ -30,7 +31,8 @@ def build_model(args):
     # build linear probing
     lbp = LinearProb(encoder=v,
                      n_class=args.n_class,
-                     masking_ratio=0).to(args.device)
+                     masking_ratio=0,
+                     device=args.device).to(args.device)
 
     return lbp
 
@@ -43,13 +45,19 @@ def train(args):
                                           batch_size=args.batch_size,
                                           n_worker=args.n_worker,
                                           is_train=True)
+    test_loader, args.n_class = load_data(args.data_dir,
+                                          args.data_name,
+                                          image_size=args.image_size,
+                                          batch_size=args.batch_size,
+                                          n_worker=args.n_worker,
+                                          is_train=False)
 
     # build linear probing model and restore encoder weights
     model = build_model(args)
     state_dict_encoder = model.encoder.state_dict()
     state_dict_loaded = torch.load(args.ckpt)['model']
     for k in state_dict_encoder.keys():
-        state_dict_encoder[k] = state_dict_loaded[k]
+        state_dict_encoder[k] = state_dict_loaded['encoder.'+k]
     model.encoder.load_state_dict(state_dict_encoder)
 
     # build optimizer
@@ -70,6 +78,9 @@ def train(args):
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
+    # tensorboard
+    tb_logger = tensorboard_logger.Logger(logdir=args.tb_folder, flush_secs=2)
+
     for epoch in range(1, args.epochs + 1):
         # set training mode
         model.encoder.eval()
@@ -86,8 +97,7 @@ def train(args):
             # forward
             output = model(images)
             # compute loss
-            criterion = torch.nn.CrossEntropyLoss()
-            loss = criterion(output, targets)
+            loss = F.cross_entropy(output, targets)
             # back propagation
             optimizer.zero_grad()
             loss.backward()
@@ -97,38 +107,40 @@ def train(args):
             losses.update(loss.item(), args.batch_size)
 
         # log
-        args.tb_logger.log_value('loss_linear_probing', losses.avg, epoch)
+        tb_logger.log_value('loss_linear_probing', losses.avg, epoch)
 
         # eval
         if epoch % args.eval_freq == 0:
-            acc = test(args, model)
-            args.tb_logger.log_value('acc_linear_probing', acc, epoch)
+            acc = test(args, model=model, data_loader=test_loader)
+            tb_logger.log_value('acc_linear_probing', acc, epoch)
 
         # print
         if epoch % args.print_freq == 0:
-            print('- epoch {:4d}, time, {:2f}s, loss {:4f}'.format(epoch, time.time() - ts, losses.avg))
+            print('- epoch {:3d}, time, {:.2f}s, loss {:.4f}'.format(epoch, time.time() - ts, losses.avg))
 
     # save the last checkpoint
-    save_file = os.path.join(args.ckpt_dir, 'linear_probing.ckpt')
+    save_file = os.path.join(args.ckpt_folder, 'linear_probing.ckpt')
     save_ckpt(model, optimizer, args, epoch, save_file=save_file)
 
 
-def test(args, model=None, ckpt_path=None):
+def test(args, model=None, ckpt_path=None, data_loader=None):
     '''
     train the model
     :param args: args
     :param model: the test model
     :param ckpt_path: checkpoint path, if model is given, this is deactivated
+    :param data_loader: data loader
     :return: accuracy
     '''
 
     # load data
-    data_loader, args.n_class = load_data(args.data_dir,
-                                          args.data_name,
-                                          image_size=args.image_size,
-                                          batch_size=args.batch_size,
-                                          n_worker=args.n_worker,
-                                          is_train=False)
+    if data_loader is None:
+        data_loader, args.n_class = load_data(args.data_dir,
+                                              args.data_name,
+                                              image_size=args.image_size,
+                                              batch_size=args.batch_size,
+                                              n_worker=args.n_worker,
+                                              is_train=False)
 
     # restore mae model
     assert model is not None or ckpt_path is not None
@@ -146,8 +158,8 @@ def test(args, model=None, ckpt_path=None):
             # forward
             output = model(images)
             # eval
-            _, y_pred = torch.max(output, dim=1).detach().cpu().numpy()
-            acc = accuracy(targets, y_pred)
+            _, y_pred = torch.max(output, dim=1)
+            acc = accuracy(targets.detach().cpu().numpy(), y_pred.detach().cpu().numpy())
             # record
             accs.update(acc, args.batch_size)
 
@@ -159,13 +171,13 @@ def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
     args = argparse.ArgumentParser().parse_args()
 
     # device
-    args.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    args.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
     # data
     args.data_dir = 'data'
     args.data_name = data_name
     args.image_size = 256
-    args.batch_size = 256  # 16384
+    args.batch_size = 512  # 16384
     args.n_worker = 8
 
     # model
@@ -174,13 +186,11 @@ def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
     args.vit_depth = 6
     args.vit_heads = 8
     args.vit_mlp_dim = 2048
-    args.masking_ratio = 0.75  # the paper recommended 75% masked patches
-    args.decoder_dim = 512  # paper showed good results with just 512
-    args.decoder_depth = 6  # anywhere from 1 to 8
+    args.masking_ratio = 0  # the paper recommended to use uncorrupted images
 
     # train
     args.epochs = 90
-    args.base_lr = 1e-1
+    args.base_lr = 1e-3   # 1e-1
     args.lr = args.base_lr * args.batch_size / 256
     args.weight_decay = 0
     args.momentum = 0.9
@@ -191,15 +201,13 @@ def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
     args.warmup_to = eta_min + (args.lr - eta_min) * (1 + math.cos(math.pi * args.epochs_warmup / args.epochs)) / 2
 
     # print and save
-    args.print_freq = 1
-    args.eval_freq = 1
-    args.save_freq = args.epochs + 1
+    args.print_freq = 10
+    args.eval_freq = 5  # 10
 
     # tensorboard
     args.tb_folder = os.path.join('log', '{}_{}'.format(args.data_name, trail))
     if not os.path.isdir(args.tb_folder):
         os.makedirs(args.tb_folder)
-    args.tb_logger = tb_logger.Logger(logdir=args.tb_folder, flush_secs=2)
 
     # ckpt
     args.ckpt_folder = os.path.join('ckpt', '{}_{}'.format(args.data_name, trail))

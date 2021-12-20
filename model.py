@@ -7,17 +7,18 @@ from vit import Transformer
 
 
 class MAE(nn.Module):
-    def __init__(
-            self,
-            *,
-            encoder,
-            decoder_dim,
-            masking_ratio=0.75,
-            decoder_depth=1,
-            decoder_heads=8,
-            decoder_dim_head=64
-    ):
+    def __init__(self,
+                 *,
+                 encoder,
+                 decoder_dim,
+                 masking_ratio=0.75,
+                 decoder_depth=1,
+                 decoder_heads=8,
+                 decoder_dim_head=64,
+                 device='cpu'):
         super().__init__()
+        # common
+        self.device =  device
         assert 0 <= masking_ratio < 1, 'masking ratio must be kept between 0 and 1'
         self.masking_ratio = masking_ratio
 
@@ -39,8 +40,6 @@ class MAE(nn.Module):
         self.to_pixels = nn.Linear(decoder_dim, pixel_values_per_patch)
 
     def forward(self, img):
-        device = img.device
-
         # get patches
         patches = self.to_patch(img)
         batch, num_patches, *_ = patches.shape
@@ -51,11 +50,11 @@ class MAE(nn.Module):
 
         # calculate of patches needed to be masked, and get random indices, dividing it up for mask vs unmasked
         num_masked = int(self.masking_ratio * num_patches)
-        rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
+        rand_indices = torch.rand(batch, num_patches, device=self.device).argsort(dim=-1)
         masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
 
         # get the unmasked tokens to be encoded
-        batch_range = torch.arange(batch, device=device)[:, None]
+        batch_range = torch.arange(batch, device=self.device)[:, None]
         tokens = tokens[batch_range, unmasked_indices]
 
         # get the patches to be masked for the final reconstruction loss
@@ -85,8 +84,10 @@ class MAE(nn.Module):
 
 
 class LinearProb(nn.Module):
-    def __init__(self, encoder, n_class, masking_ratio=0):
+    def __init__(self, encoder, n_class, masking_ratio=0, device='cpu'):
         super(LinearProb, self).__init__()
+        # common
+        self.device = device
         assert 0 <= masking_ratio < 1, 'masking ratio must be kept between 0 and 1'
         self.masking_ratio = masking_ratio
 
@@ -96,11 +97,9 @@ class LinearProb(nn.Module):
         self.to_patch, self.patch_to_emb = encoder.to_patch_embedding[:2]
 
         # linear layer
-        self.fc = nn.Linear(encoder_dim, n_class)
+        self.fc = nn.Linear((num_patches - 1) * encoder_dim, n_class)
 
-    def foward(self, img):
-        device = img.device
-
+    def forward(self, img):
         # get patches
         patches = self.to_patch(img)
         batch, num_patches, *_ = patches.shape
@@ -111,11 +110,11 @@ class LinearProb(nn.Module):
 
         # calculate of patches needed to be masked, and get random indices, dividing it up for mask vs unmasked
         num_masked = int(self.masking_ratio * num_patches)
-        rand_indices = torch.rand(batch, num_patches, device=device).argsort(dim=-1)
+        rand_indices = torch.rand(batch, num_patches, device=self.device).argsort(dim=-1)
         masked_indices, unmasked_indices = rand_indices[:, :num_masked], rand_indices[:, num_masked:]
 
         # get the unmasked tokens to be encoded
-        batch_range = torch.arange(batch, device=device)[:, None]
+        batch_range = torch.arange(batch, device=self.device)[:, None]
         tokens = tokens[batch_range, unmasked_indices]
 
         # get the patches to be masked for the final reconstruction loss
@@ -125,6 +124,7 @@ class LinearProb(nn.Module):
         encoded_tokens = self.encoder.transformer(tokens)
 
         # feed to linear probing
-        output = self.fc(encoded_tokens)
+        latent_fea = encoded_tokens.flatten()
+        output = self.fc(latent_fea)
 
         return output

@@ -2,7 +2,7 @@ import time
 import math
 import argparse
 import torch
-import tensorboard_logger as tb_logger
+import tensorboard_logger
 
 from vit import ViT
 from model import MAE
@@ -30,7 +30,8 @@ def build_model(args):
     mae = MAE(encoder=v,
               masking_ratio=args.masking_ratio,
               decoder_dim=args.decoder_dim,
-              decoder_depth=args.decoder_depth).to(args.device)
+              decoder_depth=args.decoder_depth,
+              device=args.device).to(args.device)
 
     return mae
 
@@ -66,6 +67,9 @@ def train(args):
 
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
+    # tensorboard
+    tb_logger = tensorboard_logger.Logger(logdir=args.tb_folder, flush_secs=2)
+
     for epoch in range(1, args.epochs + 1):
         # records
         ts = time.time()
@@ -86,19 +90,19 @@ def train(args):
             losses.update(loss.item(), args.batch_size)
 
         # log
-        args.tb_logger.log_value('loss', losses.avg, epoch)
+        tb_logger.log_value('loss', losses.avg, epoch)
 
         # print
         if epoch % args.print_freq == 0:
-            print('- epoch {:4d}, time, {:2f}s, loss {:4f}'.format(epoch, time.time() - ts, losses.avg))
+            print('- epoch {:3d}, time, {:.2f}s, loss {:.4f}'.format(epoch, time.time() - ts, losses.avg))
 
         # save checkpoint
         if epoch % args.save_freq == 0:
-            save_file = os.path.join(args.ckpt_dir, 'epoch_{:4d}.ckpt'.format(epoch))
+            save_file = os.path.join(args.ckpt_folder, 'epoch_{:d}.ckpt'.format(epoch))
             save_ckpt(model, optimizer, args, epoch, save_file=save_file)
 
     # save the last checkpoint
-    save_file = os.path.join(args.ckpt_dir, 'last.ckpt')
+    save_file = os.path.join(args.ckpt_folder, 'last.ckpt')
     save_ckpt(model, optimizer, args, epoch, save_file=save_file)
 
 
@@ -107,13 +111,13 @@ def default_args(data_name, trail=0):
     args = argparse.ArgumentParser().parse_args()
 
     # device
-    args.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    args.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
 
     # data
     args.data_dir = 'data'
     args.data_name = data_name
     args.image_size = 256
-    args.batch_size = 256   #4096
+    args.batch_size = 512   # 4096
     args.n_worker = 8
 
     # model
@@ -127,7 +131,7 @@ def default_args(data_name, trail=0):
     args.decoder_depth = 6  # anywhere from 1 to 8
 
     # train
-    args.epochs = 800
+    args.epochs = 100   # 800
     args.base_lr = 1.5e-4
     args.lr = args.base_lr * args.batch_size / 256
     args.weight_decay = 5e-2
@@ -139,14 +143,13 @@ def default_args(data_name, trail=0):
     args.warmup_to = eta_min + (args.lr - eta_min) * (1 + math.cos(math.pi * args.epochs_warmup / args.epochs)) / 2
 
     # print and save
-    args.print_freq = 50
-    args.save_freq = args.epochs + 1
+    args.print_freq = 10
+    args.save_freq = 50   # 100
 
     # tensorboard
     args.tb_folder = os.path.join('log', '{}_{}'.format(args.data_name, trail))
     if not os.path.isdir(args.tb_folder):
         os.makedirs(args.tb_folder)
-    args.tb_logger = tb_logger.Logger(logdir=args.tb_folder, flush_secs=2)
 
     # ckpt
     args.ckpt_folder = os.path.join('ckpt', '{}_{}'.format(args.data_name, trail))
