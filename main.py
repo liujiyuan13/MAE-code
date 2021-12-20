@@ -79,7 +79,7 @@ def train(args):
 
         # print
         if epoch % args.print_freq == 0:
-            print('- epoch {:4d}, time, {.2f}s, loss {.4f}'.format(epoch, time.time() - ts, losses.avg))
+            print('- epoch {:4d}, time, {:2f}s, loss {:4f}'.format(epoch, time.time() - ts, losses.avg))
 
         # save checkpoint
         if epoch % args.save_freq == 0:
@@ -130,7 +130,7 @@ def test(args, model=None, ckpt_path=None):
     return accs.avg
 
 
-def default_args(data_name):
+def default_args(data_name, trail=0):
     # params
     args = argparse.ArgumentParser().parse_args()
 
@@ -163,14 +163,14 @@ def default_args(data_name):
     args.print_freq = 1
     args.save_freq = args.epochs + 1
 
-    # log
-    args.tb_folder = os.path.join('log', args.data_name)
+    # tensorboard
+    args.tb_folder = os.path.join('log', '{}_{}'.format(args.data_name, trail))
     if not os.path.isdir(args.tb_folder):
         os.makedirs(args.tb_folder)
-    args.logger = tb_logger.Logger(logdir=args.tb_folder, flush_secs=2)
+    args.tb_logger = tb_logger.Logger(logdir=args.tb_folder, flush_secs=2)
 
     # ckpt
-    args.ckpt_folder = os.path.join('ckpt', args.data_name)
+    args.ckpt_folder = os.path.join('ckpt', '{}_{}'.format(args.data_name, trail))
     if not os.path.isdir(args.ckpt_folder):
         os.makedirs(args.ckpt_folder)
 
