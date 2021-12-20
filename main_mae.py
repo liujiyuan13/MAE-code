@@ -1,10 +1,11 @@
 import time
+import math
 import argparse
 import torch
 import tensorboard_logger as tb_logger
 
 from vit import ViT
-from mae import MAE
+from model import MAE
 from util import *
 
 # for re-produce
@@ -18,22 +19,18 @@ def build_model(args):
     :return: model
     '''
     # build model
-    v = ViT(
-        image_size=args.image_size,
-        patch_size=args.patch_size,
-        num_classes=args.n_class,
-        dim=args.vit_dim,
-        depth=args.vit_depth,
-        heads=args.vit_heads,
-        mlp_dim=args.vit_mlp_dim
-    )
+    v = ViT(image_size=args.image_size,
+            patch_size=args.patch_size,
+            num_classes=args.n_class,
+            dim=args.vit_dim,
+            depth=args.vit_depth,
+            heads=args.vit_heads,
+            mlp_dim=args.vit_mlp_dim)
 
-    mae = MAE(
-        encoder=v,
-        masking_ratio=args.masking_ratio,
-        decoder_dim=args.decoder_dim,
-        decoder_depth=args.decoder_depth
-    ).to(args.device)
+    mae = MAE(encoder=v,
+              masking_ratio=args.masking_ratio,
+              decoder_dim=args.decoder_dim,
+              decoder_depth=args.decoder_depth).to(args.device)
 
     return mae
 
@@ -52,9 +49,22 @@ def train(args):
     model.train()
 
     # build optimizer
-    optim = torch.optim.Adam(model.parameters(),
-                             lr=args.learning_rate,
-                             weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(model.parameters(),
+                                  lr=args.base_lr,
+                                  weight_decay=args.weight_decay,
+                                  betas=args.momentum)
+
+    # learning rate scheduler: warmup + consine
+    def lr_lambda(epoch):
+        if epoch < args.epochs_warmup:
+            p = epoch / args.epochs_warmup
+            lr = args.warmup_from + p * (args.warmup_to - args.warmup_from)
+        else:
+            eta_min = args.lr * (args.lr_decay_rate ** 3)
+            lr = eta_min + (args.lr - eta_min) * (1 + math.cos(math.pi * epoch / args.epochs)) / 2
+        return lr
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lr_lambda)
 
     for epoch in range(1, args.epochs + 1):
         # records
@@ -68,14 +78,15 @@ def train(args):
             # forward
             loss = model(images)
             # back propagation
-            optim.zero_grad()
+            optimizer.zero_grad()
             loss.backward()
-            optim.step()
+            optimizer.step()
+            scheduler.step()
             # record
             losses.update(loss.item(), args.batch_size)
 
         # log
-        args.tb_logger.log_value('loss_train', losses.avg, epoch)
+        args.tb_logger.log_value('loss', losses.avg, epoch)
 
         # print
         if epoch % args.print_freq == 0:
@@ -84,50 +95,11 @@ def train(args):
         # save checkpoint
         if epoch % args.save_freq == 0:
             save_file = os.path.join(args.ckpt_dir, 'epoch_{:4d}.ckpt'.format(epoch))
-            save_ckpt(model, optim, args, epoch, save_file=save_file)
+            save_ckpt(model, optimizer, args, epoch, save_file=save_file)
 
     # save the last checkpoint
     save_file = os.path.join(args.ckpt_dir, 'last.ckpt')
-    save_ckpt(model, optim, args, epoch, save_file=save_file)
-
-
-def test(args, model=None, ckpt_path=None):
-    '''
-    test the model
-    :param args: args
-    :param model: the test model
-    :param ckpt_path: checkpoint path, if model is given, this is deactivated
-    :return: accuracy
-    '''
-
-    # load data
-    data_loader, args.n_class = load_data(args.data_dir,
-                                          args.data_name,
-                                          image_size=args.image_size,
-                                          batch_size=args.batch_size,
-                                          n_worker=args.n_worker,
-                                          is_train=False)
-
-    # restore mae model
-    assert model is not None or ckpt_path is not None
-    if model is None:
-        model = build_model(args)
-        model = load_ckpt(model, ckpt_path)
-    model.eval()
-
-    # test
-    accs = AverageMeter()
-    with torch.no_grad():
-        for idx, (images, targets) in enumerate(data_loader):
-            # put images into device
-            images = images.to(args.device)
-            # forward
-            output = model.encoder(images)
-            # eval
-
-            # accs.update(acc, args.batch_size)
-
-    return accs.avg
+    save_ckpt(model, optimizer, args, epoch, save_file=save_file)
 
 
 def default_args(data_name, trail=0):
@@ -141,7 +113,7 @@ def default_args(data_name, trail=0):
     args.data_dir = 'data'
     args.data_name = data_name
     args.image_size = 256
-    args.batch_size = 128
+    args.batch_size = 256   #4096
     args.n_worker = 8
 
     # model
@@ -155,12 +127,19 @@ def default_args(data_name, trail=0):
     args.decoder_depth = 6  # anywhere from 1 to 8
 
     # train
-    args.learning_rate = 1e-3
-    args.weight_decay = 1e-3
-    args.epochs = 1000
+    args.epochs = 800
+    args.base_lr = 1.5e-4
+    args.lr = args.base_lr * args.batch_size / 256
+    args.weight_decay = 5e-2
+    args.momentum = (0.9, 0.95)
+    args.epochs_warmup = 40
+    args.warmup_from = 1e-4
+    args.lr_decay_rate = 1e-2
+    eta_min = args.lr * (args.lr_decay_rate ** 3)
+    args.warmup_to = eta_min + (args.lr - eta_min) * (1 + math.cos(math.pi * args.epochs_warmup / args.epochs)) / 2
 
     # print and save
-    args.print_freq = 1
+    args.print_freq = 50
     args.save_freq = args.epochs + 1
 
     # tensorboard

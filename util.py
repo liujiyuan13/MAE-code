@@ -40,7 +40,7 @@ def load_data(data_dir, data_name, is_train, image_size, batch_size, n_worker):
     if data_name is 'cifar10':
         MEAN, STD = (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
         transform = transforms.Compose([
-            transforms.Resize(image_size),
+            transforms.RandomResizedCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(mean=MEAN, std=STD),
         ])
@@ -48,21 +48,21 @@ def load_data(data_dir, data_name, is_train, image_size, batch_size, n_worker):
     elif data_name is 'cifar100':
         MEAN, STD = (0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)
         transform = transforms.Compose([
-            transforms.Resize(image_size),
+            transforms.RandomResizedCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(mean=MEAN, std=STD)
         ])
         data = datasets.CIFAR100(data_dir, transform=transform, train=is_train, download=True)
     elif data_name is 'stl10':
         transform = transforms.Compose([
-            transforms.Resize(image_size),
+            transforms.RandomResizedCrop(image_size),
             transforms.ToTensor()
         ])
         data = datasets.STL10(data_dir, transform=transform, split='train' if is_train else 'test', download=True)
     elif data_name is 'imagenet':
         MEAN, STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)  # constants in timm.data.constants
         transform = transforms.Compose([
-            transforms.Resize(image_size),
+            transforms.RandomResizedCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(mean=MEAN, std=STD)
         ])
