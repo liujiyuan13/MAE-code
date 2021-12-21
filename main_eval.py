@@ -78,7 +78,7 @@ def train(args):
         optimizer = torch.optim.AdamW(model.parameters(),
                                     lr=args.base_lr,
                                     weight_decay=args.weight_decay,
-                                    momentum=args.momentum)
+                                    betas=args.momentum)
 
     # learning rate scheduler: warmup + consine
     def lr_lambda(epoch):
@@ -99,7 +99,7 @@ def train(args):
         # set training mode
         model.encoder.eval()
         model.fc.train()
-        if args.n_partial == 0.5 or (args.n_partial is int and 1 <= args.n_partial <= args.vit_depth):
+        if args.n_partial == 0.5 or (type(args.n_partial) is int and 1 <= args.n_partial <= args.vit_depth):
             model.encoder.mlp_head.train()
             for i in range(1, int(args.n_partial)+1):
                 model.encoder.transformer.layers[args.vit_depth-i].train()
