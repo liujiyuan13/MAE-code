@@ -12,6 +12,7 @@ import torch
 import tensorboard_logger
 
 from vit import ViT
+from lars import LARS
 from model import EvalNet, LabelSmoothing
 from util import *
 
@@ -70,10 +71,14 @@ def train(args):
 
     # build optimizer
     if args.n_partial == 0:
-        optimizer = torch.optim.SGD(model.parameters(),
-                                    lr=args.base_lr,
-                                    weight_decay=args.weight_decay,
-                                    momentum=args.momentum)
+        # optimizer = torch.optim.SGD(model.parameters(),
+        #                             lr=args.base_lr,
+        #                             weight_decay=args.weight_decay,
+        #                             momentum=args.momentum)
+        optimizer = LARS(model.parameters(),
+                         lr=args.base_lr,
+                         weight_decay=args.weight_decay,
+                         momentum=args.momentum)
     else:
         optimizer = torch.optim.AdamW(model.parameters(),
                                     lr=args.base_lr,
