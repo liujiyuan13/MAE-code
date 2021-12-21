@@ -42,7 +42,7 @@ def load_data(data_dir, data_name, is_train, image_size, batch_size, n_worker):
         transform = transforms.Compose([
             transforms.RandomResizedCrop(image_size),
             transforms.ToTensor(),
-            transforms.Normalize(mean=MEAN, std=STD),
+            transforms.Normalize(mean=MEAN, std=STD)
         ])
         data = datasets.CIFAR10(data_dir, transform=transform, train=is_train, download=True)
     elif data_name is 'cifar100':
@@ -66,7 +66,7 @@ def load_data(data_dir, data_name, is_train, image_size, batch_size, n_worker):
             transforms.ToTensor(),
             transforms.Normalize(mean=MEAN, std=STD)
         ])
-        data = datasets.ImageNet(data_dir, transform=transform, split='train' if is_train else 'val', download=True)
+        data = datasets.ImageFolder(os.path.join(data_dir, 'ImageNet1K', 'train' if is_train else 'val'), transform=transform)
     else:
         raise Exception(data_name + ': not supported yet.')
 

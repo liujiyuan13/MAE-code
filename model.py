@@ -117,14 +117,11 @@ class LinearProb(nn.Module):
         batch_range = torch.arange(batch, device=self.device)[:, None]
         tokens = tokens[batch_range, unmasked_indices]
 
-        # get the patches to be masked for the final reconstruction loss
-        masked_patches = patches[batch_range, masked_indices]
-
         # attend with vision transformer
         encoded_tokens = self.encoder.transformer(tokens)
 
         # feed to linear probing
-        latent_fea = encoded_tokens.flatten()
+        latent_fea = encoded_tokens.flatten(start_dim=1)
         output = self.fc(latent_fea)
 
         return output

@@ -111,7 +111,7 @@ def default_args(data_name, trail=0):
     args = argparse.ArgumentParser().parse_args()
 
     # device
-    args.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+    args.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     # data
     args.data_dir = 'data'
