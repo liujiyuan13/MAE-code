@@ -169,5 +169,5 @@ def default_args(data_name, trail=0):
 
 
 if __name__ == '__main__':
-    data_name = 'cifar10'
+    data_name = 'imagenet'
     train(default_args(data_name))

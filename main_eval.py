@@ -263,5 +263,5 @@ def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
 
 
 if __name__ == '__main__':
-    data_name = 'cifar10'
+    data_name = 'imagenet'
     train(default_args(data_name))
