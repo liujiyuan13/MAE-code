@@ -1,3 +1,10 @@
+'''
+This is written by Jiyuan Liu, Dec. 21, 2021.
+Homepage: https://liujiyuan13.github.io.
+Email: liujiyuan13@163.com.
+All rights reserved.
+'''
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -7,6 +14,9 @@ from vit import Transformer
 
 
 class MAE(nn.Module):
+    '''
+    the implementation from https://github.com/lucidrains/vit-pytorch.
+    '''
     def __init__(self,
                  *,
                  encoder,
@@ -83,9 +93,12 @@ class MAE(nn.Module):
         return recon_loss
 
 
-class LinearProb(nn.Module):
+class EvalNet(nn.Module):
+    '''
+    the encoder of masked auto-encoder + linear layer.
+    '''
     def __init__(self, encoder, n_class, masking_ratio=0, device='cpu'):
-        super(LinearProb, self).__init__()
+        super(EvalNet, self).__init__()
         # common
         self.device = device
         assert 0 <= masking_ratio < 1, 'masking ratio must be kept between 0 and 1'
@@ -125,3 +138,26 @@ class LinearProb(nn.Module):
         output = self.fc(latent_fea)
 
         return output
+
+
+class LabelSmoothing(nn.Module):
+    """
+    NLL loss with label smoothing.
+    """
+    def __init__(self, smoothing=0.0):
+        """
+        Constructor for the LabelSmoothing module.
+        :param smoothing: label smoothing factor
+        """
+        super(LabelSmoothing, self).__init__()
+        self.confidence = 1.0 - smoothing
+        self.smoothing = smoothing
+
+    def forward(self, x, target):
+        logprobs = torch.nn.functional.log_softmax(x, dim=-1)
+
+        nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
+        nll_loss = nll_loss.squeeze(1)
+        smooth_loss = -logprobs.mean(dim=-1)
+        loss = self.confidence * nll_loss + self.smoothing * smooth_loss
+        return loss.mean()

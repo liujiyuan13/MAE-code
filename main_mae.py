@@ -1,3 +1,10 @@
+'''
+This is written by Jiyuan Liu, Dec. 21, 2021.
+Homepage: https://liujiyuan13.github.io.
+Email: liujiyuan13@163.com.
+All rights reserved.
+'''
+
 import time
 import math
 import argparse
@@ -117,21 +124,23 @@ def default_args(data_name, trail=0):
     args.data_dir = 'data'
     args.data_name = data_name
     args.image_size = 256
-    args.batch_size = 512   # 4096
     args.n_worker = 8
 
     # model
+    # - use ViT-Base whose parameters are referred from "Dosovitskiy et al. An Image is Worth 16x16 Words: Transformers
+    # - for Image Recognition at Scale. ICLR 2021. https://openreview.net/forum?id=YicbFdNTTy".
     args.patch_size = 32
-    args.vit_dim = 1024
-    args.vit_depth = 6
-    args.vit_heads = 8
-    args.vit_mlp_dim = 2048
+    args.vit_dim = 768
+    args.vit_depth = 12
+    args.vit_heads = 12
+    args.vit_mlp_dim = 3072
     args.masking_ratio = 0.75  # the paper recommended 75% masked patches
-    args.decoder_dim = 512  # paper showed good results with just 512
-    args.decoder_depth = 6  # anywhere from 1 to 8
+    args.decoder_dim = 512  # paper showed good results with 512
+    args.decoder_depth = 8  # paper showed good results with 8
 
     # train
-    args.epochs = 100   # 800
+    args.batch_size = 4096
+    args.epochs = 800
     args.base_lr = 1.5e-4
     args.lr = args.base_lr * args.batch_size / 256
     args.weight_decay = 5e-2
@@ -143,8 +152,8 @@ def default_args(data_name, trail=0):
     args.warmup_to = eta_min + (args.lr - eta_min) * (1 + math.cos(math.pi * args.epochs_warmup / args.epochs)) / 2
 
     # print and save
-    args.print_freq = 10
-    args.save_freq = 50   # 100
+    args.print_freq = 5
+    args.save_freq = 100
 
     # tensorboard
     args.tb_folder = os.path.join('log', '{}_{}'.format(args.data_name, trail))

@@ -1,12 +1,18 @@
+'''
+This is written by Jiyuan Liu, Dec. 21, 2021.
+Homepage: https://liujiyuan13.github.io.
+Email: liujiyuan13@163.com.
+All rights reserved.
+'''
+
 import time
 import math
 import argparse
 import torch
-import torch.nn.functional as F
 import tensorboard_logger
 
 from vit import ViT
-from model import LinearProb
+from model import EvalNet, LabelSmoothing
 from util import *
 
 # for re-produce
@@ -15,7 +21,7 @@ set_seed(0)
 
 def build_model(args):
     '''
-    Build MAE model.
+    build EvalNet model and restore weights
     :param args: model args
     :return: model
     '''
@@ -29,12 +35,19 @@ def build_model(args):
             mlp_dim=args.vit_mlp_dim).to(args.device)
 
     # build linear probing
-    lbp = LinearProb(encoder=v,
-                     n_class=args.n_class,
-                     masking_ratio=0,
-                     device=args.device).to(args.device)
+    enet = EvalNet(encoder=v,
+                   n_class=args.n_class,
+                   masking_ratio=0,
+                   device=args.device).to(args.device)
 
-    return lbp
+    # restore weights
+    state_dict_encoder = enet.encoder.state_dict()
+    state_dict_loaded = torch.load(args.ckpt)['model']
+    for k in state_dict_encoder.keys():
+        state_dict_encoder[k] = state_dict_loaded['encoder.' + k]
+    enet.encoder.load_state_dict(state_dict_encoder)
+
+    return enet
 
 
 def train(args):
@@ -52,19 +65,20 @@ def train(args):
                                           n_worker=args.n_worker,
                                           is_train=False)
 
-    # build linear probing model and restore encoder weights
+    # build model
     model = build_model(args)
-    state_dict_encoder = model.encoder.state_dict()
-    state_dict_loaded = torch.load(args.ckpt)['model']
-    for k in state_dict_encoder.keys():
-        state_dict_encoder[k] = state_dict_loaded['encoder.'+k]
-    model.encoder.load_state_dict(state_dict_encoder)
 
     # build optimizer
-    optimizer = torch.optim.SGD(model.parameters(),
-                                lr=args.base_lr,
-                                weight_decay=args.weight_decay,
-                                momentum=args.momentum)
+    if args.n_partial == 0:
+        optimizer = torch.optim.SGD(model.parameters(),
+                                    lr=args.base_lr,
+                                    weight_decay=args.weight_decay,
+                                    momentum=args.momentum)
+    else:
+        optimizer = torch.optim.AdamW(model.parameters(),
+                                    lr=args.base_lr,
+                                    weight_decay=args.weight_decay,
+                                    momentum=args.momentum)
 
     # learning rate scheduler: warmup + consine
     def lr_lambda(epoch):
@@ -85,6 +99,14 @@ def train(args):
         # set training mode
         model.encoder.eval()
         model.fc.train()
+        if args.n_partial == 0.5 or (args.n_partial is int and 1 <= args.n_partial <= args.vit_depth):
+            model.encoder.mlp_head.train()
+            for i in range(1, int(args.n_partial)+1):
+                model.encoder.transformer.layers[args.vit_depth-i].train()
+        elif args.n_partial == 0:
+            pass
+        else:
+            raise ValueError('please check requirements of \'args.n_partial\'.')
 
         # records
         ts = time.time()
@@ -97,7 +119,11 @@ def train(args):
             # forward
             output = model(images)
             # compute loss
-            loss = F.cross_entropy(output, targets)
+            if args.label_smoothing:
+                criterion = LabelSmoothing(smoothing=args.smoothing)   # use label smoothing technique
+            else:
+                criterion = torch.nn.CrossEntropyLoss()   # common and simplest one
+            loss = criterion(output, targets)
             # back propagation
             optimizer.zero_grad()
             loss.backward()
@@ -107,19 +133,19 @@ def train(args):
             losses.update(loss.item(), args.batch_size)
 
         # log
-        tb_logger.log_value('loss_linear_probing', losses.avg, epoch)
+        tb_logger.log_value('loss_eval_partial_{}'.format(args.n_partial), losses.avg, epoch)
 
         # eval
         if epoch % args.eval_freq == 0:
             acc = test(args, model=model, data_loader=test_loader)
-            tb_logger.log_value('acc_linear_probing', acc, epoch)
+            tb_logger.log_value('acc_eval_partial_{}'.format(args.n_partial), acc, epoch)
 
         # print
         if epoch % args.print_freq == 0:
             print('- epoch {:3d}, time, {:.2f}s, loss {:.4f}'.format(epoch, time.time() - ts, losses.avg))
 
     # save the last checkpoint
-    save_file = os.path.join(args.ckpt_folder, 'linear_probing.ckpt')
+    save_file = os.path.join(args.ckpt_folder, 'enet_partial_{}.ckpt'.format(args.n_partial))
     save_ckpt(model, optimizer, args, epoch, save_file=save_file)
 
 
@@ -171,38 +197,58 @@ def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
     args = argparse.ArgumentParser().parse_args()
 
     # device
-    args.device = torch.device('cuda:1' if torch.cuda.is_available() else 'cpu')
+    args.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     # data
     args.data_dir = 'data'
     args.data_name = data_name
     args.image_size = 256
-    args.batch_size = 512  # 16384
     args.n_worker = 8
 
     # model
     args.patch_size = 32
-    args.vit_dim = 1024
-    args.vit_depth = 6
-    args.vit_heads = 8
-    args.vit_mlp_dim = 2048
+    args.vit_dim = 768
+    args.vit_depth = 12
+    args.vit_heads = 12
+    args.vit_mlp_dim = 3072
     args.masking_ratio = 0  # the paper recommended to use uncorrupted images
 
+    # linear probing or partial fine-tuning or fine-tuning
+    # - 0: linear probing, the encoder is fixed
+    # - 0.5: fine-tuning MLP sub-block with the transformer fixed
+    # - 1~(args.vit_depth-1): partial fine-tuning, including MLP sub-block and last layers of transformer
+    # - args.vit_depth: fine-tuning, including MLP sub-block and all layers of transformer
+    args.n_partial = 0
+
     # train
-    args.epochs = 90
-    args.base_lr = 1e-3   # 1e-1
-    args.lr = args.base_lr * args.batch_size / 256
-    args.weight_decay = 0
-    args.momentum = 0.9
-    args.epochs_warmup = 10
+    if args.n_partial == 0:
+        args.batch_size = 16384
+        args.epochs = 90
+        args.base_lr = 1e-1
+        args.lr = args.base_lr * args.batch_size / 256
+        args.weight_decay = 0
+        args.momentum = 0.9
+        args.epochs_warmup = 10
+    else:
+        args.batch_size = 1024
+        args.epochs = 100
+        args.base_lr = 1e-3
+        args.lr = args.base_lr * args.batch_size / 256
+        args.weight_decay = 5e-2
+        args.momentum = (0.9, 0.999)
+        args.epochs_warmup = 5
     args.warmup_from = 1e-4
     args.lr_decay_rate = 1e-2
     eta_min = args.lr * (args.lr_decay_rate ** 3)
     args.warmup_to = eta_min + (args.lr - eta_min) * (1 + math.cos(math.pi * args.epochs_warmup / args.epochs)) / 2
 
+    # extra
+    args.label_smoothing = True
+    args.smoothing = 0.1
+
     # print and save
-    args.print_freq = 10
-    args.eval_freq = 5  # 10
+    args.print_freq = 5
+    args.eval_freq = 5
 
     # tensorboard
     args.tb_folder = os.path.join('log', '{}_{}'.format(args.data_name, trail))

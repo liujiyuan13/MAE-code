@@ -1,3 +1,10 @@
+'''
+This is written by Jiyuan Liu, Dec. 21, 2021.
+Homepage: https://liujiyuan13.github.io.
+Email: liujiyuan13@163.com.
+All rights reserved.
+'''
+
 import os
 import numpy as np
 import random
