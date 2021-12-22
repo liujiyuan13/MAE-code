@@ -24,7 +24,7 @@ Pytorch implementation of Masked Auto-Encoder:
 - For *Cifar10*, *Cifar100* and *STL*, skip this step for it will be done automatically;
 - For *ImageNet1K*, [download](https://www.image-net.org/download) and unzip the train(val) set into `./data/ImageNet1K/train(val)`.
 4. Set parameters.
-- All parameters are kept in `defualt_args()` function of `main_mae(eval).py` file.
+- All parameters are kept in `default_args()` function of `main_mae(eval).py` file.
 5. Run the code.
 ```
 > python main_mae.py	# train MAE encoder
@@ -55,6 +55,19 @@ README.md
 util.py 			# helper functions
 vit.py 				# definition of vision transformer
 ```
+
+### Encoder setting
+
+In the paper, *ViT-Base*, *ViT-Large* and *ViT-Huge* are used. 
+You can switch between them by simply changing the parameters in `default_args()`.
+Details can be found [here](https://openreview.net/forum?id=YicbFdNTTy) and are listed in following table.
+
+|  Name | Layer Num. | Hidden Size |   MLP Size  | Head Num. |
+|:-----:|:----------:|:-----------:|:-----------:|:---------:|
+|  Arg  |  vit_depth |   vit_dim   | vit_mlp_dim | vit_heads |
+| ViT-B |     12     |     768     |     3072    |     12    |
+| ViT-L |     24     |     1024    |     4096    |     16    |
+| ViT-H |     32     |     1280    |     5120    |     16    |
 
 ### Evaluation setting
 
