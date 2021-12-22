@@ -17,7 +17,7 @@ from torch.utils.data import DataLoader
 def set_seed(seed=0):
     """
     set seed for torch.
-    @param seed: int, defualt 0
+    @param seed: int, default 0
     """
     random.seed(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)

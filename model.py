@@ -142,7 +142,7 @@ class EvalNet(nn.Module):
 
 class LabelSmoothing(nn.Module):
     """
-    NLL loss with label smoothing.
+    NLL loss with label smoothing from https://github.com/NVIDIA/DeepLearningExamples.
     """
     def __init__(self, smoothing=0.0):
         """
@@ -155,7 +155,6 @@ class LabelSmoothing(nn.Module):
 
     def forward(self, x, target):
         logprobs = torch.nn.functional.log_softmax(x, dim=-1)
-
         nll_loss = -logprobs.gather(dim=-1, index=target.unsqueeze(1))
         nll_loss = nll_loss.squeeze(1)
         smooth_loss = -logprobs.mean(dim=-1)

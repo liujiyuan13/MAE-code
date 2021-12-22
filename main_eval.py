@@ -52,6 +52,11 @@ def build_model(args):
 
 
 def train(args):
+    '''
+    train the model
+    :param args: parameters
+    :return:
+    '''
     # load data
     data_loader, args.n_class = load_data(args.data_dir,
                                           args.data_name,
@@ -198,6 +203,13 @@ def test(args, model=None, ckpt_path=None, data_loader=None):
 
 
 def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
+    '''
+    for default parameters. tune them upon your options
+    :param data_name: dataset name, such as 'imagenet'
+    :param trail: an int indicator to specify different runnings
+    :param ckpt_file: path of the trained MAE model
+    :return:
+    '''
     # params
     args = argparse.ArgumentParser().parse_args()
 
@@ -268,5 +280,6 @@ def default_args(data_name, trail=0, ckpt_file='last.ckpt'):
 
 
 if __name__ == '__main__':
+
     data_name = 'imagenet'
     train(default_args(data_name))

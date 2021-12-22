@@ -21,7 +21,7 @@ set_seed(0)
 
 def build_model(args):
     '''
-    Build MAE model.
+    build MAE model.
     :param args: model args
     :return: model
     '''
@@ -44,6 +44,11 @@ def build_model(args):
 
 
 def train(args):
+    '''
+    train the model
+    :param args: parameters
+    :return:
+    '''
     # load data
     data_loader, args.n_class = load_data(args.data_dir,
                                           args.data_name,
@@ -114,6 +119,12 @@ def train(args):
 
 
 def default_args(data_name, trail=0):
+    '''
+    for default parameters. tune them upon your options
+    :param data_name: dataset name, such as 'imagenet'
+    :param trail: an int indicator to specify different runnings
+    :return:
+    '''
     # params
     args = argparse.ArgumentParser().parse_args()
 
@@ -169,5 +180,6 @@ def default_args(data_name, trail=0):
 
 
 if __name__ == '__main__':
+
     data_name = 'imagenet'
     train(default_args(data_name))
