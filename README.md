@@ -70,8 +70,8 @@ I implement four network training strategies concerned in the paper, including
 
 Note that the last three strategies are done in *main_eval.py* where parameter *args.n_partial* is located.
 
-At the same time, I follow the parameter settings in the paper which are also captured in following.
-Note that **partial fine-tuning** and **end-to-end fine-tuning** use a same setting as the last picture.
+At the same time, I follow the parameter settings in the paper appendix.
+Note that **partial fine-tuning** and **end-to-end fine-tuning** use the same setting.
 Nevertheless, I replace *RandAug(9, 0.5)* with *RandomResizedCrop* and leave *mixup*, *cutmix* and *drop path* techniques in further implementation. 
 
 
