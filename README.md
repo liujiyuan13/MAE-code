@@ -22,9 +22,9 @@ Pytorch implementation of Masked Auto-Encoder:
 ```
 3. Prepare datasets. 
 - For *Cifar10*, *Cifar100* and *STL*, skip this step for it will be done automatically;
-- For *ImageNet1K*, [download](https://www.image-net.org/download) and unzip the train(val) set into *./data/ImageNet1K/train(val)*.
+- For *ImageNet1K*, [download](https://www.image-net.org/download) and unzip the train(val) set into `./data/ImageNet1K/train(val)`.
 4. Set parameters.
-- All parameters are kept in *defualt_args(\*)* function of * main_\*.py* file.
+- All parameters are kept in `defualt_args()` function of `main_mae(eval).py` file.
 5. Run the code.
 ```
 > python main_mae.py	# train MAE encoder
@@ -59,20 +59,20 @@ vit.py 				# definition of vision transformer
 ### Evaluation setting
 
 I implement four network training strategies concerned in the paper, including 
-- **pre-training** is used to train MAE encoder and done in *main_mae.py*.
+- **pre-training** is used to train MAE encoder and done in `main_mae.py`.
 - **linear probing** is used to evaluate MAE encoder. During training, MAE encoder is fixed.
-	+ *args.n_partial = 0*
+	+ `args.n_partial = 0`
 - **partial fine-tuning** is used to evaluate MAE encoder. During training, MAE encoder is partially fixed.
-	+ *args.n_partial = 0.5* --> fine-tuning MLP sub-block with the transformer fixed
-	+ *1<=args.n_partial<=args.vit_depth-1* --> fine-tuning MLP sub-block and last layers of transformer
+	+ `args.n_partial = 0.5` --> fine-tuning MLP sub-block with the transformer fixed
+	+ `1<=args.n_partial<=args.vit_depth-1` --> fine-tuning MLP sub-block and last layers of transformer
 - **end-to-end fine-tuning** is used to evaluate MAE encoder. During training, MAE encoder is fully trainable.
-	+ *args.n_partial = args.vit_depth*
+	+ `args.n_partial = args.vit_depth`
 
-Note that the last three strategies are done in *main_eval.py* where parameter *args.n_partial* is located.
+Note that the last three strategies are done in `main_eval.py` where parameter `args.n_partial` is located.
 
 At the same time, I follow the parameter settings in the paper appendix.
 Note that **partial fine-tuning** and **end-to-end fine-tuning** use the same setting.
-Nevertheless, I replace *RandAug(9, 0.5)* with *RandomResizedCrop* and leave *mixup*, *cutmix* and *drop path* techniques in further implementation. 
+Nevertheless, I replace `RandAug(9, 0.5)` with `RandomResizedCrop` and leave `mixup`, `cutmix` and `drop path` techniques in further implementation. 
 
 
 ## Result
