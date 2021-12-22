@@ -4,7 +4,7 @@ Pytorch implementation of Masked Auto-Encoder:
 
 * Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, Ross Girshick. [Masked Autoencoders Are Scalable Vision Learners](https://arxiv.org/abs/2111.06377v1). arXiv 2021.
 
-![Masked Auto-Encoder Structure](https://github.com/liujiyuan13/MAE-code/blob/master/img/mae.png)
+![Masked Auto-Encoder Structure](https://github.com/liujiyuan13/MAE-code/blob/main/img/mae.png)
 
 
 ## Usage
@@ -70,11 +70,11 @@ Note that the last three strategies are done in *main_eval.py* where parameter *
 
 At the same time, I follow the parameter settings in the paper which are also captured in following.
 
-![Pre-training Setting](https://github.com/liujiyuan13/MAE-code/blob/master/img/pre-training_setting.png)
+![Pre-training Setting](https://github.com/liujiyuan13/MAE-code/blob/main/img/pre-training_setting.png)
 
-![Linear Probing Setting](https://github.com/liujiyuan13/MAE-code/blob/master/img/linear_probing_setting.png)
+![Linear Probing Setting](https://github.com/liujiyuan13/MAE-code/blob/main/img/linear_probing_setting.png)
 
-![Fine-tuning Setting](https://github.com/liujiyuan13/MAE-code/blob/master/img/fine-tuning_setting.png)
+![Fine-tuning Setting](https://github.com/liujiyuan13/MAE-code/blob/main/img/fine-tuning_setting.png)
 
 Note that **partial fine-tuning** and **end-to-end fine-tuning** use a same setting as the last picture.
 Nevertheless, I replace *RandAug(9, 0.5)* with *RandomResizedCrop* and leave *mixup*, *cutmix* and *drop path* techniques in further implementation. 
@@ -93,7 +93,7 @@ If you find any, please raise issues or email me.
 
 ## Licence
 
-This repository is under [GPL V3](https://github.com/liujiyuan13/MAE-code/blob/master/LICENSE).
+This repository is under [GPL V3](https://github.com/liujiyuan13/MAE-code/blob/main/LICENSE).
 
 ## About
 
