@@ -71,19 +71,6 @@ I implement four network training strategies concerned in the paper, including
 Note that the last three strategies are done in *main_eval.py* where parameter *args.n_partial* is located.
 
 At the same time, I follow the parameter settings in the paper which are also captured in following.
-
-<div align="center">
-<img src=https://github.com/liujiyuan13/MAE-code/blob/main/img/pre-training_setting.png width=80% />
-</div>
-
-<div align="center">
-<img src=https://github.com/liujiyuan13/MAE-code/blob/main/img/linear_probing_setting.png width=80% />
-</div>
-
-<div align="center">
-<img src=https://github.com/liujiyuan13/MAE-code/blob/main/img/fine-tuning_setting.png width=80% />
-</div>
-
 Note that **partial fine-tuning** and **end-to-end fine-tuning** use a same setting as the last picture.
 Nevertheless, I replace *RandAug(9, 0.5)* with *RandomResizedCrop* and leave *mixup*, *cutmix* and *drop path* techniques in further implementation. 
 
